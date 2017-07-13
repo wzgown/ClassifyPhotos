@@ -22,6 +22,7 @@ import exiftool
 
 PhotoExtNames = ('.jpg','.png','.jpeg')
 VedioExtNames = ('.mp4','.m4v','.mts','.mov','.avi','.wmv')
+ComboTypes = ('AVCHD',) # 复合的格式，代码扫描时会当成目录，实际上应该当成一个整体来处理
 
 VedioFlag = u'QuickTime:CreateDate'
 VedioFlag2 = u'H264:DateTimeOriginal'
@@ -77,31 +78,44 @@ def getCameraDate(filename):
         cameraDate = cameraDate[:11].replace(":","-")
 
     return cameraDate
+
+def getFileDate(filefullpath):
+    state = os.stat(filefullpath)
+    fCreateTime = time.strftime("%Y-%m-%d", time.localtime(state[-2]))
+    cameraDate = fCreateTime.split(" ")[0]
+    return cameraDate
+
    
 def classifyPictures(path):  
     path = os.path.abspath(os.path.expanduser(path))
     for root,dirs,files in os.walk(path,True): 
         for  dir in dirs:
             dirpath = os.path.join(root, dir)        
+
+            if dir in ComboTypes:
+                d = getFileDate( dirpath )
+                put2newfolder(dirpath,d, True)
+                continue
+
             classifyPictures(dirpath)
 
         for filename in files:
-            filepath = os.path.join(root, filename)        
+           filepath = os.path.join(root, filename)        
 
-            extStartPos = filename.rfind('.')
-            if extStartPos == 0:
-                continue
-            extName = filename[extStartPos:].lower()
-            if not (extName in PhotoExtNames or extName in VedioExtNames):
-                print u'非影像文件:', filepath
-                continue 
+           extStartPos = filename.rfind('.')
+           if extStartPos == 0:
+               continue
+           extName = filename[extStartPos:].lower()
+           if not (extName in PhotoExtNames or extName in VedioExtNames):
+               print u'非影像文件:', filepath
+               continue 
 
-            d = getCameraDate( filepath )
-            # 将文件移动到目的地
-            put2newfolder(filepath,d)
+           d = getCameraDate( filepath )
+           # 将文件移动到目的地
+           put2newfolder(filepath,d)
 
 
-def put2newfolder(path, d):
+def put2newfolder(path, d, isTree = False):
     # 确定新的文件存放路径
     dp=d.split('-')
     ym='/'.join(dp[:2])
@@ -112,10 +126,15 @@ def put2newfolder(path, d):
         os.makedirs(dst)
     
     fname=os.path.split(path)[-1]
-    if os.path.exists(os.path.join(dst, fname)):
+    dstFullPath = os.path.join(dst, fname)
+    if os.path.exists(dstFullPath):
         return
 
-    shutil.copy2( path, dst )  
+    if isTree:
+        shutil.copytree(path, dstFullPath)
+    else:
+        shutil.copy2( path, dst )
+
     if arguments['--mv']:
         os.remove( path )  
 
