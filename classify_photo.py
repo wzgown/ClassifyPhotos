@@ -21,10 +21,11 @@ import sys
 import exiftool
 
 PhotoExtNames = ('.jpg','.png','.jpeg')
-VedioExtNames = ('.mp4','.m4v','.mts','.mov','.avi')
+VedioExtNames = ('.mp4','.m4v','.mts','.mov','.avi','.wmv')
 
 VedioFlag = u'QuickTime:CreateDate'
 VedioFlag2 = u'H264:DateTimeOriginal'
+VedioFlag3 = u'ASF:CreationDate'
 ImgFlag = u'EXIF:DateTimeOriginal'
 ImgFlag2 = u'EXIF:CreateDate'
 
@@ -59,20 +60,21 @@ def getCameraDate(filename):
     meta = etInstance.get_metadata(filename)
     if ImgFlag in meta:
         cameraDate = meta[ImgFlag]
-        cameraDate = cameraDate[:11].replace(":","-")
     elif ImgFlag2 in meta:
         cameraDate = meta[ImgFlag2]
-        cameraDate = cameraDate[:11].replace(":","-")
     elif VedioFlag in meta:
         cameraDate = meta[VedioFlag]
-        cameraDate = cameraDate[:11].replace(":","-")
     elif VedioFlag2 in meta:
         cameraDate = meta[VedioFlag2]
-        cameraDate = cameraDate[:11].replace(":","-")
+    elif VedioFlag3 in meta:
+        cameraDate = meta[VedioFlag3]
     else:
         print 'not found create date in meta for', filename
         print meta
         print # blank line
+    
+    if cameraDate.count(":") > 0:
+        cameraDate = cameraDate[:11].replace(":","-")
 
     return cameraDate
    
