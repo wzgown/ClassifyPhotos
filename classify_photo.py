@@ -32,9 +32,8 @@ ImgFlag2 = u'EXIF:CreateDate'
 
 arguments = {}
 store_path = ""
-etInstance = None
 
-def getCameraDate(filename):
+def getCameraDate(filename, etInstance):
     '''取得照片或者视频的元信息，
     返回给调用者：拍摄的日期和时间
     '''
@@ -58,7 +57,12 @@ def getCameraDate(filename):
         fCreateTime = time.strftime("%Y-%m-%d", time.localtime(state[-2]))
         cameraDate = fCreateTime.split(" ")[0]
 
+
+
     meta = etInstance.get_metadata(filename)
+    if isinstance(meta, list):
+        meta = meta[0]
+
     if ImgFlag in meta:
         cameraDate = meta[ImgFlag]
     elif ImgFlag2 in meta:
@@ -70,12 +74,14 @@ def getCameraDate(filename):
     elif VedioFlag3 in meta:
         cameraDate = meta[VedioFlag3]
     else:
-        print 'not found create date in meta for', filename
-        print meta
-        print # blank line
+        # 检查meta是否是array
+        print('not found create date in meta for', filename, "default cameraDate", cameraDate)
+        print(meta)
+        print() # blank line
     
     if cameraDate.count(":") > 0:
         cameraDate = cameraDate[:11].replace(":","-")
+        print("cameraDate", cameraDate)
 
     return cameraDate
 
@@ -86,7 +92,7 @@ def getFileDate(filefullpath):
     return cameraDate
 
    
-def classifyPictures(path):  
+def classifyPictures(path, etInstance):  
     path = os.path.abspath(os.path.expanduser(path))
     for root,dirs,files in os.walk(path,True): 
         for  dir in dirs:
@@ -97,31 +103,36 @@ def classifyPictures(path):
                 put2newfolder(dirpath,d, True)
                 continue
 
-            classifyPictures(dirpath)
+            classifyPictures(dirpath, etInstance)
 
         for filename in files:
-           filepath = os.path.join(root, filename)        
+            if filename.endswith('_thumbnail.png'):
+                print(u'非影像文件:', filename)
+                continue
 
-           extStartPos = filename.rfind('.')
-           if extStartPos == 0:
-               continue
-           extName = filename[extStartPos:].lower()
-           if not (extName in PhotoExtNames or extName in VedioExtNames):
-               print u'非影像文件:', filepath
-               continue 
+            filepath = os.path.join(root, filename)        
 
-           d = getCameraDate( filepath )
-           # 将文件移动到目的地
-           put2newfolder(filepath,d)
+            extStartPos = filename.rfind('.')
+            if extStartPos == 0:
+                continue
+            extName = filename[extStartPos:].lower()
+            if not (extName in PhotoExtNames or extName in VedioExtNames):
+                print(u'非影像文件:', filepath)
+                continue 
+
+            d = getCameraDate(filepath, etInstance)
+            # 将文件移动到目的地
+            put2newfolder(filepath,d)
 
 
 def put2newfolder(path, d, isTree = False):
     # 确定新的文件存放路径
     dp=d.split('-')
     ym='/'.join(dp[:2])
-    _sp = store_path.decode('utf-8')
+    #_sp = store_path.decode('utf-8')
+    _sp = store_path
     dst = os.path.join(_sp, ym)
-    path = path.decode('utf-8')
+
     if not os.path.exists(dst):  
         os.makedirs(dst)
     
@@ -131,7 +142,7 @@ def put2newfolder(path, d, isTree = False):
         return
 
     if isTree:
-        shutil.copytree(path, dstFullPath)
+        result = shutil.copytree(path, dstFullPath)
     else:
         shutil.copy2( path, dst )
 
@@ -159,14 +170,12 @@ if __name__ == "__main__":
     store_path = os.path.abspath(os.path.expanduser(store_path))
 
     if not os.path.exists(arguments['--in']):  
-        print "input path is not exist!", arguments['--in']
+        print("input path is not exist!", arguments['--in'])
 
-    print "store_path",store_path
+    print("store_path",store_path)
     if not os.path.exists(store_path):  
         os.mkdir(store_path)
 
-    etInstance = exiftool.ExifTool()
-    etInstance.start()
     # 开始归类整理文件
-    classifyPictures(arguments['--in'])
-    etInstance.terminate()
+    with exiftool.ExifToolHelper() as et:
+        classifyPictures(arguments['--in'], et)
